@@ -2,7 +2,7 @@
   (:require [seesaw.core :as ss])
   (:import [org.opencv.imgproc Imgproc]
  		   [org.opencv.highgui Highgui]
-           [org.opencv.core Mat MatOfByte Size CvType Scalar]
+           [org.opencv.core Mat MatOfByte MatOfPoint MatOfPoint2f Size CvType Scalar Point Core]
            [javax.imageio ImageIO]))
 
 
@@ -14,14 +14,14 @@
           f (ss/frame :title "Image Viewer" :size [640 :by 480] :content panel)]
       (-> f ss/show!))))
 
-(defn scale [src width]
+(defn scale [src height]
 	(let [dest (Mat.)
-     	  scale (/ width (.width src))] 
+     	  scale (/ height (.height src))] 
  		(Imgproc/resize src dest (Size.) scale scale Imgproc/INTER_AREA)
    	dest))
 
 (defn draw! [image]
-  (draw-raw! (scale image 640)))
+  (draw-raw! (scale image 480)))
 
 (defn grayscale [src]
 	(let [dest (Mat. (.size src) CvType/CV_8SC1)]
@@ -45,14 +45,42 @@
                                Imgproc/THRESH_BINARY_INV block-size threshold)
     dest))
 
-(defn find-contours [src]
+(defn find-external-contour [src]
   (let [contours (java.util.LinkedList. )]
-    (Imgproc/findContours src contours (Mat.) Imgproc/RETR_CCOMP Imgproc/CHAIN_APPROX_SIMPLE)
-    contours))
+    (Imgproc/findContours src contours (Mat.) Imgproc/RETR_EXTERNAL Imgproc/CHAIN_APPROX_SIMPLE)
+    (first contours)))
 
-(defn draw-contours! [image contours]
+(defn draw-contours! [image contour-list]
   (let [copy (.clone image)]
-    (Imgproc/drawContours copy contours -1 (Scalar. 255 0 0) 5)
+    (Imgproc/drawContours copy contour-list -1 (Scalar. 255 0 0) 5)
     (draw! copy)))
 
+(defn to-float-points [points]
+  (let [dest (Mat.)]
+    (.convertTo points dest CvType/CV_32FC2)
+    dest))
 
+(defn bounding-rect [contour] 
+  (Imgproc/minAreaRect (MatOfPoint2f. (to-float-points contour))))
+
+(defn rotated-rect-to-points [rotated-rect]
+  (let [points (into-array Point (repeat 4 (Point.) ))]
+    (.points rotated-rect points)
+    points))
+
+(defn affine-matrix-unrotate-rect [rotated-rect]
+  (Imgproc/getRotationMatrix2D (.center rotated-rect) (.angle rotated-rect) 1.0))
+
+(defn unrotate-image [src rotated-rect]
+  (let [dest (Mat. (.size src) (.type src))
+        affineMatrix (affine-matrix-unrotate-rect rotated-rect)]
+    (Imgproc/warpAffine src dest affineMatrix (.size dest))
+    dest))
+
+(defn unrotate-rect [rotated-rect]
+  (let [copy (.clone rotated-rect)]
+    (set! (.angle copy) 0)
+    (.boundingRect copy)))
+
+(defn crop [src rotated-rect]
+  (Mat. (unrotate-image src rotated-rect) (unrotate-rect rotated-rect)))

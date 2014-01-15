@@ -13,7 +13,7 @@
 (deftest scale-test
   (testing "fit to width"
     (let [single (Highgui/imread "resources/examples/single_card_table.jpg")]
-    (is (= 640.0 (.width (.size (scale single 640)))))))) 
+    (is (= 480.0 (.height (.size (scale single 480)))))))) 
 
 (deftest gaussian-blur-test 
   (testing "blur should uhhhhh "
@@ -36,5 +36,13 @@
     (let [single (Highgui/imread "resources/examples/single_card_table.jpg")]
     (is (= 1 (.channels (canny single 500 700)))))))
 
+(deftest find-external-contour-test 
+  (testing "find-external-contour should return a matrix of points"
+    (let [single (Highgui/imread "resources/examples/single_card_table.jpg")]
+    (is (= org.opencv.core.MatOfPoint (class (find-external-contour (canny single 500 700))))))))
 
-; (CvType/typeToString (.type single))
+(deftest bounding-rect-test
+  (testing "bounding-rect should return a RotatedRect"
+    (let [single (Highgui/imread "resources/examples/single_card_table.jpg")]
+    (is (= org.opencv.core.RotatedRect (class (bounding-rect (find-external-contour (canny single 500 700)))))))))
+  
