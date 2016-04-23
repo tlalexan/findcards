@@ -3,17 +3,17 @@
             [seesaw.keymap :as ssk]
             [clojure.core.matrix :as m])
   (:import [org.opencv.imgproc Imgproc Subdiv2D]
- 		       [org.opencv.highgui Highgui VideoCapture]
+           [org.opencv.imgcodecs Imgcodecs]
            [org.opencv.core Mat MatOfByte MatOfPoint MatOfPoint2f Size CvType Scalar Point Core RotatedRect]
            [javax.imageio ImageIO]))
-  
+
 (m/set-current-implementation :vectorz)  
   
 
 
 (defn draw-raw! [^Mat matrix-img]
   (let [mob (MatOfByte.)]
-    (Highgui/imencode ".jpg" matrix-img mob)
+    (Imgcodecs/imencode ".jpg" matrix-img mob)
     (let [buf-img (ImageIO/read (java.io.ByteArrayInputStream. (.toArray mob)))
           panel (ss/grid-panel :paint (fn [c g] (.drawImage g buf-img 0 0 nil)))
           f (ss/frame :title "Image Viewer" :size [640 :by 480] :content panel :on-close :dispose)
@@ -22,17 +22,17 @@
       (ss/show! f))))
 
 (defn mat-scale [src height]
-	(let [dest (Mat.)
-     	  scale (/ height (.height src))] 
- 		(Imgproc/resize src dest (Size.) scale scale Imgproc/INTER_AREA)
-   	dest))
+  (let [dest (Mat.)
+        scale (/ height (.height src))] 
+    (Imgproc/resize src dest (Size.) scale scale Imgproc/INTER_AREA)
+    dest))
 
 (defn draw! [image]
   (draw-raw! (mat-scale image 480)))
 
 (defn grayscale [src]
-	(let [dest (Mat. (.size src) CvType/CV_8SC1)]
- 		(Imgproc/cvtColor src dest Imgproc/COLOR_RGB2GRAY)	
+  (let [dest (Mat. (.size src) CvType/CV_8SC1)]
+    (Imgproc/cvtColor src dest Imgproc/COLOR_RGB2GRAY)  
     dest))
 
 (defn gaussian-blur [src square-size sigma-x]
@@ -46,7 +46,7 @@
     dest))
 
 (defn threshold [src block-size threshold]
-	(let [dest (Mat. (.size src) (.type src))] 
+  (let [dest (Mat. (.size src) (.type src))] 
     (Imgproc/adaptiveThreshold src dest 
                                255 Imgproc/ADAPTIVE_THRESH_GAUSSIAN_C 
                                Imgproc/THRESH_BINARY_INV block-size threshold)
@@ -161,10 +161,10 @@
   (if (clockwise? poly)
     poly
     (reverse poly)))
-                                       
+
 (defn draw-poly! [image & polys]
   (let [copy (.clone image)]
-    (Core/polylines copy (map to-mat polys) true (Scalar. 0 0 255) 5)
+    (Imgproc/polylines copy (map to-mat polys) true (Scalar. 0 0 255) 5)
     (draw! copy)))
   
 (defn edges [polygon-points]
@@ -187,7 +187,7 @@
       (filter 
          four-sided 
          (map contour-to-poly ( find-contours-min-area ( dilate (threshold (grayscale src) 13 10) dilate-iters) 0.03 0.2)))))
-  ([src] (find-cards src 5)))
+  ([src] (find-cards src 8)))
 
 (defn normalize
   ([src long-edge-first-poly normalized-card-height normalized-card-padding card-ratio]
@@ -202,7 +202,7 @@
          matrix (Imgproc/getPerspectiveTransform (to-mat2f long-edge-first-poly) (to-mat2f normalized-card-poly))
          padded-normalized-card-frame-size (as-size padded-normalized-card-frame)
          dest (Mat. padded-normalized-card-frame-size (.type src))]
-    (Imgproc/warpPerspective src dest matrix (.size dest) Imgproc/INTER_LINEAR Imgproc/BORDER_CONSTANT (Scalar. 0 0 0))
+    (Imgproc/warpPerspective src dest matrix (.size dest) Imgproc/INTER_LINEAR Core/BORDER_CONSTANT (Scalar. 0 0 0))
     dest))
   ([src long-edge-first-poly normalized-card-height normalized-card-padding ]
     (normalize src long-edge-first-poly normalized-card-height normalized-card-padding (/ 5 7) ))
@@ -211,13 +211,13 @@
 
 (comment
 
-(def image (Highgui/imread "resources/examples/single_card_angle_capture.png"))
+(def image (Imgcodecs/imread "resources/examples/single_card_angle_capture.png"))
 (def contours (find-contours-min-area (canny image 100 500) 0.05))
 (def contour (first contours))
 (def poly (longest-edge-first (mat-to-seq (approx-poly contour))))
 
 
-(def five (Highgui/imread "resources/examples/five_cards.jpg"))(
+(def five (Imgcodecs/imread "resources/examples/five_cards.jpg"))(
 (draw! five (find-external-contours (canny five 100 500))))
 
 )
