@@ -2,14 +2,12 @@
   (:require [seesaw.core :as ss]
             [seesaw.keymap :as ssk]
             [clojure.core.matrix :as m])
-  (:import [org.opencv.imgproc Imgproc Subdiv2D]
+  (:import [org.opencv.imgproc Imgproc ]
            [org.opencv.imgcodecs Imgcodecs]
-           [org.opencv.core Mat MatOfByte MatOfPoint MatOfPoint2f Size CvType Scalar Point Core RotatedRect]
+           [org.opencv.core Mat MatOfByte MatOfPoint MatOfPoint2f Size CvType Scalar Point Core ]
            [javax.imageio ImageIO]))
 
-(m/set-current-implementation :vectorz)  
-  
-
+(m/set-current-implementation :vectorz)
 
 (defn draw-raw! [^Mat matrix-img]
   (let [mob (MatOfByte.)]
@@ -35,15 +33,6 @@
     (Imgproc/cvtColor src dest Imgproc/COLOR_RGB2GRAY)  
     dest))
 
-(defn gaussian-blur [src square-size sigma-x]
-  (let [dest (Mat. (.size src) (.type src))] 
-    (Imgproc/GaussianBlur src dest (Size. square-size square-size) sigma-x)
-    dest))
-
-(defn canny [src threshold-low threshold-high]
-  (let [dest (Mat. (.size src) (.type src))] 
-    (Imgproc/Canny src dest threshold-low threshold-high)
-    dest))
 
 (defn threshold [src block-size threshold]
   (let [dest (Mat. (.size src) (.type src))] 
@@ -52,25 +41,12 @@
                                Imgproc/THRESH_BINARY_INV block-size threshold)
     dest))
 
-(defn erode 
-  ([src iterations] 
-     (let [dest (Mat. (.size src) (.type src))] 
-      (Imgproc/erode src dest (Mat.) (Point. -1 -1) iterations)
-      dest))
-  ([src] (erode src 1)))
-
 (defn dilate 
   ([src iterations] 
      (let [dest (Mat. (.size src) (.type src))] 
       (Imgproc/dilate src dest (Mat.) (Point. -1 -1) iterations)
       dest))
   ([src] (dilate src 1)))
-
-
-(defn find-external-contours [src]
-  (let [contours (java.util.LinkedList. )]
-    (Imgproc/findContours src contours (Mat.) Imgproc/RETR_EXTERNAL Imgproc/CHAIN_APPROX_SIMPLE)
-    contours))
 
 (defn find-contours [src]
   (let [contours (java.util.LinkedList. )]
@@ -90,36 +66,6 @@
   (let [copy (.clone image)]
     (Imgproc/drawContours copy contour-list -1 (Scalar. 255 0 0) 5)
     (draw! copy)))
-
-(defn to-float-points [points]
-  (let [dest (Mat.)]
-    (.convertTo points dest CvType/CV_32FC2)
-    dest))
-
-(defn bounding-rect [contour] 
-  (Imgproc/minAreaRect (MatOfPoint2f. (to-float-points contour))))
-
-(defn rotated-rect-to-points [rotated-rect]
-  (let [points (into-array Point (repeat 4 (Point.) ))]
-    (.points rotated-rect points)
-    points))
-
-(defn affine-matrix-unrotate-rect [rotated-rect]
-  (Imgproc/getRotationMatrix2D (.center rotated-rect) (.angle rotated-rect) 1.0))
-
-(defn unrotate-image [src rotated-rect]
-  (let [dest (Mat. (.size src) (.type src))
-        affineMatrix (affine-matrix-unrotate-rect rotated-rect)]
-    (Imgproc/warpAffine src dest affineMatrix (.size dest))
-    dest))
-
-(defn unrotate-rect [rotated-rect]
-  (let [copy (.clone rotated-rect)]
-    (set! (.angle copy) 0)
-    (.boundingRect copy)))
-
-(defn crop [src rotated-rect]
-  (Mat. (unrotate-image src rotated-rect) (unrotate-rect rotated-rect)))
 
 (defn approx-poly 
   ([contour] (approx-poly contour 50))
@@ -142,9 +88,7 @@
 (defn to-mat2f [poly]
   (MatOfPoint2f. (into-array (map (fn [point] (Point. (double (first point)) (double (second point)))) poly))))
 
-
 (defn as-size [point] (Size. (first point) (second point)))
-
 
 (defn clockwise? 
   "see https://en.wikipedia.org/wiki/Curve_orientation#Orientation_of_a_simple_polygon" 
@@ -186,8 +130,8 @@
           contour-to-poly (fn [contour] (longest-edge-first (clockwise (mat-to-seq (approx-poly contour)))))]
       (filter 
          four-sided 
-         (map contour-to-poly ( find-contours-min-area ( dilate (threshold (grayscale src) 13 10) dilate-iters) 0.03 0.2)))))
-  ([src] (find-cards src 8)))
+         (map contour-to-poly (find-contours-min-area (dilate (threshold (grayscale src) 123 10) dilate-iters) 0.02 0.2)))))
+  ([src] (find-cards src 12)))
 
 (defn normalize
   ([src long-edge-first-poly normalized-card-height normalized-card-padding card-ratio]
@@ -211,13 +155,15 @@
 
 (comment
 
-(def image (Imgcodecs/imread "resources/examples/single_card_angle_capture.png"))
-(def contours (find-contours-min-area (canny image 100 500) 0.05))
-(def contour (first contours))
-(def poly (longest-edge-first (mat-to-seq (approx-poly contour))))
 
+(def image (Imgcodecs/imread "resources/examples/another_twelve_set_cards.jpg"))
 
-(def five (Imgcodecs/imread "resources/examples/five_cards.jpg"))(
-(draw! five (find-external-contours (canny five 100 500))))
+(draw! (threshold (grayscale image) 123 10) )
+(draw! (dilate (threshold (grayscale image) 123 10) 8))
+
+(apply draw-poly! image (find-cards image 12))
+(draw! (normalize image (first (find-cards image 12))))
+
+(map-indexed (fn [i p] (Imgcodecs/imwrite (str (+ i 20) ".jpg") (normalize image p))) (find-cards image 12))
 
 )
