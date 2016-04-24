@@ -8,6 +8,8 @@
                  [opencv/opencv "3.1.0"]
                  [seesaw "1.4.4"]]
   :plugins [[lein-localrepo "0.5.2"]]
-  :injections [(clojure.lang.RT/loadLibrary org.opencv.core.Core/NATIVE_LIBRARY_NAME)]
-  :require findcards.core
-  :repl-options {:init-ns findcards.core})
+  :injections [
+      (clojure.lang.RT/loadLibrary org.opencv.core.Core/NATIVE_LIBRARY_NAME)
+      (use `findcards.core) ]
+  :require findcards.core)
+

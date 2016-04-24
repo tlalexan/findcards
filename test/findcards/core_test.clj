@@ -16,33 +16,33 @@
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")]
     (is (= 480.0 (.height (.size (mat-scale single 480)))))))) 
 
-(deftest grayscale-test 
-  (testing "grayscale should convert an image to a single channel"
+(deftest to-grayscale-test 
+  (testing "to-grayscale should convert an image to a single channel"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")]
-    (is (= 1 (.channels (grayscale single)))))))
+    (is (= 1 (.channels (to-grayscale single)))))))
 
 (deftest threshold-test 
   (testing "threshold should convert an image to a single channel"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          gray (grayscale single)]
+          gray (to-grayscale single)]
     (is (= 1 (.channels (threshold gray 7 10)))))))
 
 (deftest find-contours-test
   (testing "find-contours should return a list of coutours"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (grayscale single) 123 10) 8)]
+          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)]
       (is (> (count (find-contours single-edges)) 1)))))
 
 (deftest find-contours-min-area-test
   (testing "find-contours should return a list of coutours"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (grayscale single) 123 10) 8)]
-      (is (= (count (find-contours-min-area single-edges 0.05 0.20)) 1)))))
+          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)]
+      (is (= (count (find-contours-min-area single-edges 0.10 0.20)) 1)))))
   
 (deftest approx-poly-test
   (testing "approxPoly should return MatOfPoint2f"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (grayscale single) 123 10) 8)
+          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)
           contour (first (find-contours single-edges))]
       (is (= org.opencv.core.MatOfPoint2f (class (approx-poly contour)))))))
 
@@ -75,7 +75,11 @@
   (testing "another_twelve_set_cards has more than 9 cards"
     (is (<= 9 (count (find-cards (Imgcodecs/imread "resources/examples/another_twelve_set_cards.jpg")))))))
 
-
 (deftest normalize-test
   (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")]
     (is (= (Size. 264 350) (.size (normalize single (first (find-cards single))))))))
+
+(deftest card-color-test
+  (is (= :red (card-color (card-image :red :squiggle :solid 1))))
+  (is (= :purple (card-color (card-image :purple :squiggle :solid 3))))
+  (is (= :green (card-color (card-image :green :squiggle :solid 2)))))

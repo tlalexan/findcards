@@ -4,7 +4,10 @@
             [clojure.core.matrix :as m])
   (:import [org.opencv.imgproc Imgproc ]
            [org.opencv.imgcodecs Imgcodecs]
-           [org.opencv.core Mat MatOfByte MatOfPoint MatOfPoint2f Size CvType Scalar Point Core ]
+           [org.opencv.core Mat MatOfByte MatOfPoint 
+                            MatOfPoint2f MatOfInt MatOfFloat 
+                            Size CvType Scalar 
+                            Point Core Size Rect ]
            [javax.imageio ImageIO]))
 
 (m/set-current-implementation :vectorz)
@@ -28,9 +31,10 @@
 (defn draw! [image]
   (draw-raw! (mat-scale image 480)))
 
-(defn grayscale [src]
+
+(defn to-grayscale [src]
   (let [dest (Mat. (.size src) CvType/CV_8SC1)]
-    (Imgproc/cvtColor src dest Imgproc/COLOR_RGB2GRAY)  
+    (Imgproc/cvtColor src dest Imgproc/COLOR_BGR2GRAY)  
     dest))
 
 
@@ -130,7 +134,7 @@
           contour-to-poly (fn [contour] (longest-edge-first (clockwise (mat-to-seq (approx-poly contour)))))]
       (filter 
          four-sided 
-         (map contour-to-poly (find-contours-min-area (dilate (threshold (grayscale src) 123 10) dilate-iters) 0.02 0.2)))))
+         (map contour-to-poly (find-contours-min-area (dilate (threshold (to-grayscale src) 123 10) dilate-iters) 0.02 0.2)))))
   ([src] (find-cards src 12)))
 
 (defn normalize
@@ -152,18 +156,88 @@
     (normalize src long-edge-first-poly normalized-card-height normalized-card-padding (/ 5 7) ))
   ([src long-edge-first-poly] (normalize src long-edge-first-poly 300 25)))
 
+(defn crop [image percent-to-remove]
+  (let [size (.size image)
+        width (.width size)
+        width-diffrence (int (* width (/ percent-to-remove 100)))
+        x-offset (int (/ width-diffrence 2))
+        height (.height size)
+        height-diffrence (int (* height (/ percent-to-remove 100)))
+        y-offset (int (/ height-diffrence 2))]
 
-(comment
+    (Mat. image (Rect. x-offset y-offset (- width width-diffrence) (- height height-diffrence))) 
+  )
+)
 
+(defn to-hsv [image]
+  (let [dest (Mat.)]
+    (Imgproc/cvtColor image dest Imgproc/COLOR_BGR2HSV)
+    dest))
+
+(defn hue-histogram 
+  ([image bins]
+    (let [h-size (MatOfInt. (int-array [bins])) ; 50 bins of hue
+          h-range (MatOfFloat. (float-array [0 180])) ; hue varies from 0 to 179
+          channels (MatOfInt. (int-array [0])) ; only want first channel (hue)
+          histogram (MatOfFloat.)
+          normalized-histogram (MatOfFloat.)]
+    (Imgproc/calcHist [(to-hsv image)] channels (Mat.) histogram h-size h-range false)
+    (Core/normalize histogram normalized-histogram 0 1 Core/NORM_MINMAX -1 (Mat.))
+    normalized-histogram))
+  ([image] (hue-histogram image 10)))
+
+
+(defn solid-image [red green blue]
+  (.setTo (Mat. (Size. 10.0 10.0) CvType/CV_8UC3) (Scalar. blue green red)))
+
+(def solid-red (solid-image 193 112 90))
+(def solid-red-histogram (hue-histogram solid-red))
+(def solid-green (solid-image 19 159 62))
+(def solid-green-histogram (hue-histogram solid-green))
+(def solid-purple (solid-image 112 80 143))
+(def solid-purple-histogram (hue-histogram solid-purple))
+
+(defn compare-histogram [a b]
+  (Imgproc/compareHist a b Imgproc/CV_COMP_CORREL))
+
+(defn card-hue-compared-to-reference-images [card-image]
+  (let [h (hue-histogram card-image)]
+    (sorted-map :red (compare-histogram h solid-red-histogram) 
+                :purple (compare-histogram h solid-purple-histogram) 
+                :green (compare-histogram h solid-green-histogram))))
+
+(defn card-color [card-image]
+  (let [comparisons (card-hue-compared-to-reference-images (crop card-image 20))]
+    (key (last (sort-by val comparisons)))))
+
+; helps write test and the repl
+
+(defn card-filename[color shape shading number]
+   (str "resources/examples/set_cards/" (name color) "_" (name shape) "_" (name shading) "_" number ".jpg"))
+
+(defn card-image[color shape shading number]
+   (Imgcodecs/imread (card-filename color shape shading number)))
+
+
+(fn []
+; Stuff to try in the repl...
 
 (def image (Imgcodecs/imread "resources/examples/another_twelve_set_cards.jpg"))
 
-(draw! (threshold (grayscale image) 123 10) )
-(draw! (dilate (threshold (grayscale image) 123 10) 8))
+(draw! (threshold (to-grayscale image) 123 10) )
+(draw! (dilate (threshold (to-grayscale image) 123 10) 8))
 
 (apply draw-poly! image (find-cards image 12))
 (draw! (normalize image (first (find-cards image 12))))
 
 (map-indexed (fn [i p] (Imgcodecs/imwrite (str (+ i 20) ".jpg") (normalize image p))) (find-cards image 12))
+
+
+(def red-squiggle-solid-1 (card-image :red :squiggle :solid 1))
+(def red-hist (hue-histogram red-squiggle-solid-1))
+(def purple-squiggle-solid-3 (card-image :purple :squiggle :solid 3))
+(def purple-hist (hue-histogram purple-squiggle-solid-3))
+(def green-squiggle-solid-2 (card-image :green :squiggle :solid 2))
+(def green-hist (hue-histogram green-squiggle-solid-2))
 
 )
