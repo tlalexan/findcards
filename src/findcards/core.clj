@@ -239,7 +239,7 @@
         histogram (.toList (hue-histogram cropped-card mask 30))
         index-of-largest (first (apply max-key second (map-indexed vector histogram)))]
     ; (draw! cropped-card )
-    (draw! saturation-mask)
+    ; (draw! saturation-mask)
     ; (draw! value-mask)
     ; (draw! mask)
     ; histogram))
@@ -302,5 +302,6 @@
 (draw-histogram! (crop (card-image :purple :oval :outlined 1) 20))
 (draw-histogram! (crop (card-image :purple :squiggle :solid 3) 20))
 
+(card-color green-squiggle-solid-2)
 
 )
