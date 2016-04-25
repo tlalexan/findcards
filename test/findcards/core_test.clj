@@ -81,7 +81,7 @@
 
 (deftest card-color-test
   (is (= :red (card-color (card-image :red :squiggle :solid 1))))
-  (is (= :red (card-color (card-image :red :oval :solid 3))))
+  (is (= :red (card-color (card-image :red :oval :stripped 3))))
   (is (= :purple (card-color (card-image :purple :squiggle :solid 3))))
   (is (= :purple (card-color (card-image :purple :diamond :outlined 1))))
   (is (= :green (card-color (card-image :green :squiggle :solid 2))))

@@ -45,12 +45,35 @@
                                Imgproc/THRESH_BINARY_INV block-size threshold)
     dest))
 
+(defn binary-threshold [image threshold]
+  (let [dest (Mat. (.size image) (.type image))] 
+    (Imgproc/threshold image dest threshold 255 Imgproc/THRESH_BINARY)
+    dest))
+
+(defn binary-threshold-inverted [image threshold]
+  (let [dest (Mat. (.size image) (.type image))] 
+    (Imgproc/threshold image dest threshold 255 Imgproc/THRESH_BINARY_INV)
+    dest))
+
+(defn bitwise-and [image-a image-b]
+  (let [dest (Mat. (.size image-a) (.type image-a))]
+    (Core/bitwise_and image-a image-b dest)
+    dest))
+
 (defn dilate 
   ([src iterations] 
      (let [dest (Mat. (.size src) (.type src))] 
       (Imgproc/dilate src dest (Mat.) (Point. -1 -1) iterations)
       dest))
   ([src] (dilate src 1)))
+
+(defn erode 
+  ([src iterations] 
+     (let [dest (Mat. (.size src) (.type src))] 
+      (Imgproc/erode src dest (Mat.) (Point. -1 -1) iterations)
+      dest))
+  ([src] (erode src 1)))
+
 
 (defn find-contours [src]
   (let [contours (java.util.LinkedList. )]
@@ -179,46 +202,59 @@
     (Imgproc/cvtColor image dest Imgproc/COLOR_HSV2BGR)
     dest))
 
+(defn equalize [image]
+  (let [dest (Mat.)]
+    (Imgproc/equalizeHist image dest)
+    dest))
 
 (defn hue-histogram 
-  ([image bins]
+  ([image mask bins]
     (let [h-size (MatOfInt. (int-array [bins])) ; 50 bins of hue
           h-range (MatOfFloat. (float-array [0 180])) ; hue varies from 0 to 179
           channels (MatOfInt. (int-array [0])) ; only want first channel (hue)
           histogram (MatOfFloat.)
           normalized-histogram (MatOfFloat.)]
-    (Imgproc/calcHist [(to-hsv image)] channels (Mat.) histogram h-size h-range false)
+    (Imgproc/calcHist [(to-hsv image)] channels mask histogram h-size h-range false)
     (Core/normalize histogram normalized-histogram 0 1 Core/NORM_MINMAX -1 (Mat.))
     normalized-histogram))
-  ([image] (hue-histogram image 9)))
+  ([image mask] (hue-histogram image mask 3))
+  ([image] (hue-histogram image (Mat.))))
 
+(defn extract-saturation [image]
+  (let [split-image (java.util.ArrayList.)]
+    (Core/split (to-hsv image) split-image)
+    (second split-image)))
 
-(defn solid-image [red green blue]
-  (.setTo (Mat. (Size. 10.0 10.0) CvType/CV_8UC3) (Scalar. blue green red)))
+(defn extract-value [image]
+  (let [split-image (java.util.ArrayList.)]
+    (Core/split (to-hsv image) split-image)
+    (nth split-image 2)))
 
-(def solid-red (solid-image 193 112 90))
-(def solid-red-histogram (hue-histogram solid-red))
-(def solid-green (solid-image 19 159 62))
-(def solid-green-histogram (hue-histogram solid-green))
-(def solid-purple (solid-image 112 80 143))
-(def solid-purple-histogram (hue-histogram solid-purple))
-
-(defn compare-histogram [a b]
-  (Imgproc/compareHist a b Imgproc/CV_COMP_CORREL))
-
-(defn card-hue-compared-to-reference-images [card-image]
-  (let [h (hue-histogram card-image)]
-    (sorted-map :red (compare-histogram h solid-red-histogram) 
-                :purple (compare-histogram h solid-purple-histogram) 
-                :green (compare-histogram h solid-green-histogram))))
 
 (defn card-color [card-image]
-  (let [comparisons (card-hue-compared-to-reference-images (crop card-image 20))]
-    (key (last (sort-by val comparisons)))))
+  (let [cropped-card (crop card-image 30)
+        saturation-mask (binary-threshold (extract-saturation cropped-card) 70)
+        value-mask (binary-threshold-inverted (extract-value cropped-card) 170)
+        mask (bitwise-and saturation-mask value-mask)
+        histogram (.toList (hue-histogram cropped-card mask 30))
+        index-of-largest (first (apply max-key second (map-indexed vector histogram)))]
+    ; (draw! cropped-card )
+    ; (draw! saturation-mask)
+    ; (draw! value-mask)
+    ; (draw! mask)
+    ; histogram))
+    ; (draw-histogram! cropped-card mask)
+    ; index-of-largest))
+    (cond
+      (>= index-of-largest 28) :red
+      (>= index-of-largest 15) :purple
+      (>= index-of-largest 4) :green
+      :else :red)))
 
 
-(defn draw-histogram! [image]
-  (let [histogram (.toList (hue-histogram image))
+(defn draw-histogram! 
+  ([image mask]
+  (let [histogram (.toList (hue-histogram image mask))
         bar-width (int (/ 180 (count histogram)))
         canvas (Mat. (Size. 180.0 50.0) CvType/CV_8UC3 (Scalar. 0 0 255))]
     (do
@@ -230,11 +266,8 @@
 
       (draw! (to-bgr canvas))
     )))
+  ([image] (draw-histogram! image (Mat.))))
 
-(defn extract-saturation [image]
-  (let [split-image (java.util.ArrayList.)]
-    (Core/split (to-hsv image) split-image)
-    (second split-image)))
 
 ; helps write test and the repl
 
