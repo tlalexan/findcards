@@ -233,13 +233,13 @@
 
 (defn card-color [card-image]
   (let [cropped-card (crop card-image 30)
-        saturation-mask (binary-threshold (extract-saturation cropped-card) 70)
-        value-mask (binary-threshold-inverted (extract-value cropped-card) 170)
+        saturation-mask (binary-threshold (extract-saturation cropped-card) 55)
+        value-mask (binary-threshold-inverted (extract-value cropped-card) 160)
         mask (bitwise-and saturation-mask value-mask)
         histogram (.toList (hue-histogram cropped-card mask 30))
         index-of-largest (first (apply max-key second (map-indexed vector histogram)))]
     ; (draw! cropped-card )
-    ; (draw! saturation-mask)
+    (draw! saturation-mask)
     ; (draw! value-mask)
     ; (draw! mask)
     ; histogram))
