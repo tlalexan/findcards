@@ -2,12 +2,13 @@
 
 Looks for cards in an image
 
-To use opencv you'll need to install the C shared libraries.  In particular also the java library.  On my box they live at 
 
 You'll also need the opencv jar which isn't distributed from maven central.  This project has a plugin that can install it...  I did ``` lein localrepo install /usr/share/opencv/java/opencv-310.jar opencv/opencv 3.1.0```
 
 See also http://docs.opencv.org/3.1.0/d7/d1e/tutorial_clojure_dev_intro.html
 
+
+To use opencv you'll need to install the C shared libraries.  In particular also the java library.  On my box they live at /usr/lib/*opencv*
 
 ```
 tomarchina% ls /usr/lib/*opencv* | grep \.so$
@@ -54,6 +55,12 @@ tomarchina% ls /usr/lib/*opencv* | grep \.so$
 /usr/lib/libopencv_xphoto.so
 ```
 
+## Usage
+This will eventually become an app that can play the game of Set http://www.setgame.com/set/puzzle 
+
+## Current State
+
+Here are some things that can be done already...  Mostly recognizing cards on a table and figuring out what color they are.
 
 ```
 bash% lein repl
