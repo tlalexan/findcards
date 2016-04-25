@@ -25,24 +25,24 @@
   (testing "threshold should convert an image to a single channel"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
           gray (to-grayscale single)]
-    (is (= 1 (.channels (threshold gray 7 10)))))))
+    (is (= 1 (.channels (adaptive-threshold gray 7 10)))))))
 
 (deftest find-contours-test
   (testing "find-contours should return a list of coutours"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)]
+          single-edges (dilate (adaptive-threshold (to-grayscale single) 123 10) 8)]
       (is (> (count (find-contours single-edges)) 1)))))
 
 (deftest find-contours-min-area-test
   (testing "find-contours should return a list of coutours"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)]
+          single-edges (dilate (adaptive-threshold (to-grayscale single) 123 10) 8)]
       (is (= (count (find-contours-min-area single-edges 0.10 0.20)) 1)))))
   
 (deftest approx-poly-test
   (testing "approxPoly should return MatOfPoint2f"
     (let [single (Imgcodecs/imread "resources/examples/single_set_card.jpg")
-          single-edges (dilate (threshold (to-grayscale single) 123 10) 8)
+          single-edges (dilate (adaptive-threshold (to-grayscale single) 123 10) 8)
           contour (first (find-contours single-edges))]
       (is (= org.opencv.core.MatOfPoint2f (class (approx-poly contour)))))))
 
@@ -81,5 +81,8 @@
 
 (deftest card-color-test
   (is (= :red (card-color (card-image :red :squiggle :solid 1))))
+  (is (= :red (card-color (card-image :red :oval :solid 3))))
   (is (= :purple (card-color (card-image :purple :squiggle :solid 3))))
-  (is (= :green (card-color (card-image :green :squiggle :solid 2)))))
+  (is (= :purple (card-color (card-image :purple :diamond :outlined 1))))
+  (is (= :green (card-color (card-image :green :squiggle :solid 2))))
+  (is (= :green (card-color (card-image :green :squiggle :stripped 1)))))

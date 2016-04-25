@@ -38,7 +38,7 @@
     dest))
 
 
-(defn threshold [src block-size threshold]
+(defn adaptive-threshold [src block-size threshold]
   (let [dest (Mat. (.size src) (.type src))] 
     (Imgproc/adaptiveThreshold src dest 
                                255 Imgproc/ADAPTIVE_THRESH_GAUSSIAN_C 
@@ -134,7 +134,7 @@
           contour-to-poly (fn [contour] (longest-edge-first (clockwise (mat-to-seq (approx-poly contour)))))]
       (filter 
          four-sided 
-         (map contour-to-poly (find-contours-min-area (dilate (threshold (to-grayscale src) 123 10) dilate-iters) 0.02 0.2)))))
+         (map contour-to-poly (find-contours-min-area (dilate (adaptive-threshold (to-grayscale src) 123 10) dilate-iters) 0.02 0.2)))))
   ([src] (find-cards src 12)))
 
 (defn normalize
@@ -174,6 +174,12 @@
     (Imgproc/cvtColor image dest Imgproc/COLOR_BGR2HSV)
     dest))
 
+(defn to-bgr [image]
+  (let [dest (Mat.)]
+    (Imgproc/cvtColor image dest Imgproc/COLOR_HSV2BGR)
+    dest))
+
+
 (defn hue-histogram 
   ([image bins]
     (let [h-size (MatOfInt. (int-array [bins])) ; 50 bins of hue
@@ -184,7 +190,7 @@
     (Imgproc/calcHist [(to-hsv image)] channels (Mat.) histogram h-size h-range false)
     (Core/normalize histogram normalized-histogram 0 1 Core/NORM_MINMAX -1 (Mat.))
     normalized-histogram))
-  ([image] (hue-histogram image 10)))
+  ([image] (hue-histogram image 9)))
 
 
 (defn solid-image [red green blue]
@@ -210,6 +216,26 @@
   (let [comparisons (card-hue-compared-to-reference-images (crop card-image 20))]
     (key (last (sort-by val comparisons)))))
 
+
+(defn draw-histogram! [image]
+  (let [histogram (.toList (hue-histogram image))
+        bar-width (int (/ 180 (count histogram)))
+        canvas (Mat. (Size. 180.0 50.0) CvType/CV_8UC3 (Scalar. 0 0 255))]
+    (do
+      ; draw a color bar across the bottom 
+      (doseq [x (range 0 180) y (range 40 50)] (.put canvas y x (byte-array [(unchecked-byte x) (unchecked-byte 254) (unchecked-byte 254)])))
+      ; draw the bars
+      (doseq [[x value] (map list (range 0 180) (flatten (map (fn [n] (take bar-width (repeat n))) histogram)))] 
+        (.put canvas (- 40 (int (* 40 value))) x (byte-array [(unchecked-byte 0) (unchecked-byte 0) (unchecked-byte 0)])))
+
+      (draw! (to-bgr canvas))
+    )))
+
+(defn extract-saturation [image]
+  (let [split-image (java.util.ArrayList.)]
+    (Core/split (to-hsv image) split-image)
+    (second split-image)))
+
 ; helps write test and the repl
 
 (defn card-filename[color shape shading number]
@@ -224,8 +250,8 @@
 
 (def image (Imgcodecs/imread "resources/examples/another_twelve_set_cards.jpg"))
 
-(draw! (threshold (to-grayscale image) 123 10) )
-(draw! (dilate (threshold (to-grayscale image) 123 10) 8))
+(draw! (adaptive-threshold (to-grayscale image) 123 10) )
+(draw! (dilate (adaptive-threshold (to-grayscale image) 123 10) 8))
 
 (apply draw-poly! image (find-cards image 12))
 (draw! (normalize image (first (find-cards image 12))))
@@ -239,5 +265,9 @@
 (def purple-hist (hue-histogram purple-squiggle-solid-3))
 (def green-squiggle-solid-2 (card-image :green :squiggle :solid 2))
 (def green-hist (hue-histogram green-squiggle-solid-2))
+
+(draw-histogram! (crop (card-image :purple :oval :outlined 1) 20))
+(draw-histogram! (crop (card-image :purple :squiggle :solid 3) 20))
+
 
 )
