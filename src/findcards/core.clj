@@ -230,6 +230,23 @@
     (Core/split (to-hsv image) split-image)
     (nth split-image 2)))
 
+(defn draw-histogram! 
+  ([image mask bins]
+  (let [histogram (.toList (hue-histogram image mask bins))
+        bar-width (int (/ 180 (count histogram)))
+        canvas (Mat. (Size. 180.0 50.0) CvType/CV_8UC3 (Scalar. 0 0 255))]
+    (do
+      ; draw a color bar across the bottom 
+      (doseq [x (range 0 180) y (range 40 50)] (.put canvas y x (byte-array [(unchecked-byte x) (byte -1) (byte -1)])))
+      ; draw the bars
+      (doseq [[x value] (map list (range 0 180) (flatten (map (fn [n] (take bar-width (repeat n))) histogram)))] 
+        (.put canvas (- 40 (int (* 40 value))) x (byte-array [(byte 0) (byte 0) (byte 0)])))
+
+      (draw! (to-bgr canvas))
+    )))
+  ([image mask] (draw-histogram! image (Mat.) 30))
+  ([image] (draw-histogram! image (Mat.))))
+
 
 (defn card-color [card-image]
   (let [cropped-card (crop card-image 30)
@@ -242,8 +259,8 @@
     ; (draw! saturation-mask)
     ; (draw! value-mask)
     ; (draw! mask)
+    ; (draw-histogram! cropped-card mask 30)
     ; histogram))
-    ; (draw-histogram! cropped-card mask)
     ; index-of-largest))
     (cond
       (>= index-of-largest 28) :red
@@ -251,22 +268,6 @@
       (>= index-of-largest 4) :green
       :else :red)))
 
-
-(defn draw-histogram! 
-  ([image mask]
-  (let [histogram (.toList (hue-histogram image mask))
-        bar-width (int (/ 180 (count histogram)))
-        canvas (Mat. (Size. 180.0 50.0) CvType/CV_8UC3 (Scalar. 0 0 255))]
-    (do
-      ; draw a color bar across the bottom 
-      (doseq [x (range 0 180) y (range 40 50)] (.put canvas y x (byte-array [(unchecked-byte x) (unchecked-byte 254) (unchecked-byte 254)])))
-      ; draw the bars
-      (doseq [[x value] (map list (range 0 180) (flatten (map (fn [n] (take bar-width (repeat n))) histogram)))] 
-        (.put canvas (- 40 (int (* 40 value))) x (byte-array [(unchecked-byte 0) (unchecked-byte 0) (unchecked-byte 0)])))
-
-      (draw! (to-bgr canvas))
-    )))
-  ([image] (draw-histogram! image (Mat.))))
 
 
 ; helps write test and the repl
